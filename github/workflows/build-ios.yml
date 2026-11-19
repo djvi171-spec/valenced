@@ -1,0 +1,42 @@
+name: Build Valenced iOS Loader
+on: [workflow_dispatch]
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout Source
+        uses: actions/checkout@v4
+
+      - name: Setup Java & Bun
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Install Theos & iOS SDK
+        run: |
+          brew install ldid xz
+          git clone --recursive https://github.com $HOME/theos
+          mkdir -p $HOME/theos/sdks
+          curl -LO https://github.com
+          tar -xf iPhoneOS16.5.sdk.tar.xz -C $HOME/theos/sdks
+
+      - name: Build Bundle & Shared Core
+        run: |
+          bun install
+          ./gradlew :core:build || true
+
+      - name: Compile iOS Tweak
+        env:
+          THEOS: ${{ env.HOME }}/theos
+        run: |
+          cd ios
+          make package FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=rootless
+
+      - name: Upload Compiled Tweak
+        uses: actions/upload-artifact@v4
+        with:
+          name: valenced-ios-tweak
+          path: ios/packages/*.deb
